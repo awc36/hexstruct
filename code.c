@@ -66,6 +66,7 @@ struct prevar
 {
     str plocation;//prefix
     str pinline;//prefix
+    str psimplify;//prefix
     str type;
     str name;
     str value;
@@ -341,6 +342,7 @@ void main(int argc, char** args)
 
                 str pinline = NULL;
                 str plocation = NULL;
+                str psimplify = NULL;
                 if(index[0] == '(')
                 {
                     index++;
@@ -424,6 +426,36 @@ void main(int argc, char** args)
                             s.values += t->len+1;
                             s.len -= t->len+1;
                         }
+                        else if(s_cmp_str(&s, "simplify=") == 1)
+                        {
+                            if(psimplify)
+                                error(&s, 0, "Double definition of the \"simplify\" prefix");
+                            s.values += 9;
+                            s.len -= 9;
+                            str t = malloc(sizeof(*t));
+                            t->cap = 0;
+                            t->values = s.values;
+                            t->len = 0;
+                            int ident = 0;
+                            while(1)
+                            {
+                                if(t->values[t->len] == '(')
+                                    ident++;
+                                if(t->values[t->len] == ')')
+                                {
+                                    if(ident > 1)
+                                        ident--;
+                                    else
+                                        break;
+                                }
+                                if(ident == 1 && t->values[t->len] == ',')
+                                    break;
+                                t->len++;
+                            }
+                            psimplify = t;
+                            s.values += t->len+1;
+                            s.len -= t->len+1;
+                        }
                         else
                             error(&s, 0, "Invalid prefix");
                     }
@@ -459,6 +491,7 @@ void main(int argc, char** args)
                     struct prevar* var = malloc(sizeof(*var));
                     var->pinline = pinline;
                     var->plocation = plocation;
+                    var->psimplify = psimplify;
                     var->type = typename;
                     var->name = name;
                     var->value = NULL;
@@ -485,6 +518,7 @@ void main(int argc, char** args)
                 struct prevar* var = malloc(sizeof(*var));
                 var->pinline = pinline;
                 var->plocation = plocation;
+                var->psimplify = psimplify;
                 var->type = typename;
                 var->name = name;
                 var->value = value;
@@ -506,6 +540,7 @@ void main(int argc, char** args)
             int* index = x->values;
             str plocation = NULL;
             str pinline = NULL;
+            str psimplify = NULL;
 
             if(index[0] == '(')
             {
@@ -588,6 +623,36 @@ void main(int argc, char** args)
                         s.values += t->len+1;
                         s.len -= t->len+1;
                     }
+                    else if(s_cmp_str(&s, "simplify=") == 1)
+                    {
+                        if(psimplify)
+                            error(&s, 0, "Double definition of the \"simplify\" prefix");
+                        s.values += 9;
+                        s.len -= 9;
+                        str t = malloc(sizeof(*t));
+                        t->cap = 0;
+                        t->values = s.values;
+                        t->len = 0;
+                        int ident = 0;
+                        while(1)
+                        {
+                            if(t->values[t->len] == '(')
+                                ident++;
+                            if(t->values[t->len] == ')')
+                            {
+                                if(ident > 1)
+                                    ident--;
+                                else
+                                    break;
+                            }
+                            if(ident == 1 && t->values[t->len] == ',')
+                                break;
+                            t->len++;
+                        }
+                        psimplify = t;
+                        s.values += t->len+1;
+                        s.len -= t->len+1;
+                    }
                     else
                         error(&s, 0, "Invalid prefix");
                 }
@@ -617,6 +682,7 @@ void main(int argc, char** args)
                 struct prevar* var = malloc(sizeof(*var));
                 var->pinline = pinline;
                 var->plocation = plocation;
+                var->psimplify = psimplify;
                 var->type = typename;
                 var->name = name;
                 var->value = NULL;
@@ -639,6 +705,7 @@ void main(int argc, char** args)
             struct prevar* var = malloc(sizeof(*var));
             var->pinline = pinline;
             var->plocation = plocation;
+            var->psimplify = psimplify;
             var->type = typename;
             var->name = name;
             var->value = value;
@@ -744,12 +811,15 @@ void parseCommand(int argc, char** args)
                    "The standart types are:i8,i16,i32,i64,i128,u8,u16,u32,u64,u128,x8,x16,x32,x64,x128,f32,f64,c8,c16,c32,s8,s16,s32\n"
                    "The f... types can't be assigned.(No error but undefined value when assigning an integer and error when assigning a float)\n"
                    "The array types can't be assigned.(including s... types)\n\n"
-                   "Expressions can have the following operands:+(unary&binary),-(unary&binary),*,/,^(power, evaluation right to left, only when \"usepow\" is defined in the sourcecode),<,<=,==,>,>=,&&,||,^^(xor)\n"
+                   "Expressions can have the following operands:+(unary&binary),-(unary&binary),*,/,^(power, evaluation right to left, only when \"usepow\" is defined in the sourcecode),<,<=,==,>,>=,&&,||,^^(xor),$(unary)\n"
                    "There isn't any error detection for expressions. So be sure that the absolute value of any operation is below 2^127.\n"
                    "Therefore u128, x128, c128 and s128 are treated as signed."
                    "You can also use initialized local and global variables.\n"
                    "To do that, just type the global path into the expression or use \"this.\" to use a local variable.\n"
                    "To get the value of an array element, just type: name[expression]\n\n"
+                   "The Stacktrace is a list of the current array indecies.\n"
+                   "The stacktrace operator \"$n\" returns the n-th index in the stacktrace\n"
+                   "$_ returns the length of the stacktrace.\n\n"
                    "Variables are initialized from top to bottom.\n"
                    "You can access the current file address in an expression with \"here\". (before the current variable)"
                    "To hide a variable the name must start with an underscore. But you can still use it in an expression.\n"
@@ -758,6 +828,7 @@ void parseCommand(int argc, char** args)
                    "The following prefixes are available:\n"
                    "    inline      The values of a variable of type struct replace the variable. (But the paths aren't inline.)\n"
                    "    location    sets the absolute location of the variable. Doesn't affect the byte pointer\n\n"
+                   "    simplify    If true (the default) discard the array ending if start=0 and end=1\n\n"
                    "Numbers can have the following prefixes (case insensitive):\n"
                    "    b   binary\n"
                    "    o   octal\n"
@@ -1150,6 +1221,8 @@ __int128 ieval(str s, struct tree this)
     #endif
     if(s->values[0] == L'$')
     {
+        if(s->values[1] == L'_' && s->len == 2)
+            return stacktrace->len;
         s->values++;
         s->len--;
         int i = ieval(s, this);
@@ -1834,9 +1907,13 @@ void addVar(struct tree* this, struct strct strct)
             }
             if(start == 0 && end == 1)
             {
+                if(entry->psimplify)
+                    if(ieval(entry->psimplify, *this))
+                        goto ignore;
                 realtypelen = start1-1;
                 goto noarray;
             }
+            ignore:;
             char* stammname = s_cstr(entry->name);
             for(int k = start; k < end; k++)
             {

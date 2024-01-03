@@ -1,0 +1,60 @@
+//GUID Partition Table
+
+#iy;
+
+struct lba0
+{
+	x8 bootindicator;//=0
+	x8[3] startingCHS;
+	x8 OSType;//=0xee
+	x8[3] endingCHS;
+	x32 startingLBA;//=1
+	x32 endingLBA;
+
+	u8[0x1f0] _padding;
+};
+
+struct lba1
+{
+	s8[8] magicbytes;
+	x32 revision;
+	x32 headersize;
+	x32 checksum;
+	x32 reserved;
+	u64 lba_of_this;
+	u64 alternate_header_lba;
+	u64 firstblock;
+	u64 lastblock;
+	x128 diskguid;
+	u64 gpea_start_lba;
+	u32 partition_entry_count;
+	u32 pea_size;
+	x32 pea_checksum;
+
+	u8[0x200-0x5c] _padding;
+};
+
+struct lba2
+{
+	(location=here)
+	x128 _partition_type;
+	x128[this._partition_type!=0] partition_type;
+	x128[this._partition_type!=0] partitionGUID;
+	u64[this._partition_type!=0] starting_lba;
+	u64[this._partition_type!=0] ending_lba;
+	x64[this._partition_type!=0] attributes;
+	s16[(lba1.pea_size-56)/2*(this._partition_type!=0)] name;
+
+	x128[this._partition_type==0] _partition_type2;
+	x128[this._partition_type==0] _partitionGUID;
+	u64[this._partition_type==0] _starting_lba;
+	u64[this._partition_type==0] _ending_lba;
+	x64[this._partition_type==0] _attributes;
+	s16[(lba1.pea_size-56)/2*(this._partition_type==0)] _name;
+
+};
+/*
+lba0;*/
+lba0 lba0;
+lba1 lba1;
+lba2[lba1.partition_entry_count] lba2;

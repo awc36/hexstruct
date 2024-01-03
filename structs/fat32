@@ -1,0 +1,101 @@
+/*
+better redirect the output to a file
+For more information, take a look at: https://osdev.org/FAT#Boot_Record
+and: https://youtube.com/watch?v=7o3qx66uLz8
+This file only shows the headers, the fat and the first 4 directory sectors for fat32. It also doesn't show the fsinfo structure.
+*/
+#iy;
+
+struct bpb
+{
+    x8[3] jmp;
+    s8[8] version;
+    u16 bytes_per_sector;
+    u8 sectors_per_cluster;
+    u16 reserved_sectors;
+    u8 number_of_fats;
+    u16 number_of_root_entries;
+    u16 sectorcount;
+    x8 description;
+    u16 sectors_per_fat;
+    u16 sectors_per_track;
+    u16 headcount;
+    u32 hiddensectorcount;
+    u32 large_sectorcount;
+};
+
+struct ebr32
+{
+    u32 sectors_per_fat;
+    x16 flags;
+    x16 version;
+    u32 cnor;
+    u16 fsinfo_sector;
+    u16 backup_sector;
+    x32[3] reserved;
+    x8 drivenumber;
+    x8 winNt_flags;
+    x8 signature;
+    x32 id;
+    s8[11] volumestr;
+    s8[8] identifier;
+    x16[422/2] _bootcode;
+};
+
+struct directory
+{
+    s8[11] name;
+    x8 attributes;
+    x8 reserved;
+    u8 creationsubseconds;
+    x16 creationtime;
+    x16 creationdate;
+    x16 accessdate;
+    x16 clusterhigh;
+    x16 modificationtime;
+    x16 modificationdate;
+    x16 clusterlow;
+    u32 filesize;
+};
+
+struct filenameext
+{
+    u8 order;
+    s16[5] first;
+    x8 attribute;
+    u8 entrytype;
+    u8 checksum;
+    s16[6] second;
+    u16 zero;
+    s16[2] third;
+};
+
+struct entry
+{
+    (location=here)
+    u128[2] _temp;
+    (location=here+11)
+    x8 _attribute;
+
+    u128[2*(this._temp[0]==0&&this._temp[1]==0)] _zero;
+    
+    (inline=true)
+    directory[this._temp[0]||this._temp[1]&&this._attribute!=0xf] dir;
+    (inline=true)
+    filenameext[this._temp[0]||this._temp[1]&&this._attribute==0xf] ext;
+};
+
+struct nonnull
+{
+    (location=here)
+    u32 _t;
+    x32[$0*(this._t!=0)][($0+1)*(this._t!=0)] fat32;
+    x32[this._t==0] _unnecisary;
+};
+
+bpb bpb;
+ebr32 ebr32;
+x8[(bpb.reserved_sectors-1)*bpb.bytes_per_sector] _padding;
+(inline=true)
+nonnull[bpb.number_of_fats*ebr32.sectors_per_fat*bpb.bytes_per_sector/4] fat32;
+entry[4*16] dir;

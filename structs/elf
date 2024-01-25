@@ -1,0 +1,52 @@
+#iy;
+
+struct header32
+{
+	x32 entrypos;
+	x32 headertablepos;
+	x32 sectionheadertablepos;
+	x32 flags;
+	x16 headersize;
+	x16 headertableentrysize;
+	x16 headertableentrycount;
+	x16 secheadertableentrysize;
+	x16 secheadertableentrycount;
+	x16 some_index;//??
+};
+
+struct header64
+{
+	x64 entrypos;
+	x64 headertablepos;
+	x64 sectionheadertablepos;
+	x32 flags;
+	x16 headersize;
+	x16 headertableentrysize;
+	x16 headertableentrycount;
+	x16 secheadertableentrysize;
+	x16 secheadertableentrycount;
+	x16 some_index;//??
+};
+
+struct header
+{
+	s8[4] elf = "\x7fELF";
+	(value[1]="32bit",value[2]="64bit")
+	u8 bits;
+	(value[1]="little",value[2]="high")
+	u8 endian;
+	(endian=(this.endian==1)*"l"+(this.endian==2)*"h")
+	u8 headerversion;
+	u8 osabi;
+	u8[8] _padding;
+	(value[1]="relocatable",value[2]="executable",value[3]="shared",value[4]="core")
+	u16 type;
+	x16 instrset;
+	u32 elfversion;
+	(inline=true)
+	header32[this.bits==1] header;
+	(inline=true)
+	header64[this.bits==2] header;
+};
+
+header header;

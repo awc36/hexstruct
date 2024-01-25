@@ -1,0 +1,7 @@
+struct main
+{
+	(location=here)
+	main main;
+};
+
+main main;

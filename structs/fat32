@@ -89,6 +89,7 @@ struct nonnull
 {
     (location=here)
     u32 _t;
+    (simplify=false)
     x32[$0*(this._t!=0)][($0+1)*(this._t!=0)] fat32;
     x32[this._t==0] _unnecisary;
 };
